@@ -17,7 +17,7 @@
 
 ```powershell
 node test/import-check.mjs   # 入口能否装载（不启动）
-node test/smoke.mjs          # 17 条裁决用例：只解析、不执行；不联网、不需要 git、不写任何文件
+node test/smoke.mjs          # 28 条裁决用例：只解析、不执行；不联网、不需要 git、不写任何文件
 ```
 
 需要：Node ≥ 22.19；Windows 上的 `powershell.exe`（5.1 即可）。

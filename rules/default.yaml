@@ -1,98 +1,196 @@
-# dsh-ast-guard · 示例规则（demo）
+# dsh-ast-guard · 默认规则
 #
-# 用途：把**每个能用的维度各演示一次**，让你看清这套规则的形状。
-# 它**不是**推荐配置 —— 复制成 `<你的工作区>/.dsh/ast-rules.yaml` 之后按自己的情况改。
+# 重点在前两组：
+#   ① 写文件内容（Set-Content / Add-Content / Clear-Content / Out-File / Tee-Object / Export-* / .NET 直写 / 重定向）
+#   ② 条目操作（Remove / Move / Rename / Copy-Item…）
+# 它们共同的特点是：**不可逆，而且 shell 里做完全不留痕** —— 没有 diff、没有快照、进不了回退。
+# 其余（内联代码、注册表、git 范围收缩）都是同一类"代价高、事后查不到"的动作。
 #
-# 两条通用约定：
-#   · needle（paths / mentions / argsContain）一律**大小写不敏感**，且是**子串**匹配，不是 glob；
-#   · `why` 的正文会**逐字**出现在拒绝文案里 —— 所以它同时是"给人看的说明"和"给智能体看的正确姿势"。
+# 判断方式：**按效应，不按命令名**。每条规则的 `why` 会逐字出现在拒绝文案里。
+# 想改成自己的一套：复制本文件，然后在插件配置里用 `rulesFile` 指过去。
+#
+# ⚠️ 别名必须逐条写死：语法树**不解析别名**（`sc` 就只是 `sc`，认不出它是 Set-Content）。
+#    本文件的别名取自本机 PowerShell 的 `Get-Alias` 实测，换机器请自己核一遍。
 version: 1
 
 deny:
-  # ① 最基础的形状：按命令名拒。
-  - id: example-write-verbs
+  # ── ① 写文件内容：命令词 + 别名 + .NET 直写 + 重定向 ───────────────────────
+  - id: content-write
     why: |
-      这条只是示例：拦"写文件内容"的命令词。
-      正确姿势：定点替换用 edit 工具；整份新写用 write 工具。
-    commands: [Set-Content, Add-Content, Clear-Content, Out-File]
-    # redirects: true   # 打开它 = 连 `>` / `>>` 一起拦（目标是 `$null` 的自动豁免）
+      PowerShell 写文件内容已禁用：会破坏编码（Get-Content 默认非 UTF-8，来回一趟毁中文），
+      而且 shell 写入没有 diff、没有快照、进不了回退。
+      正确姿势：定点替换用 edit；整份新写用 write；复制/搬运用 Copy-Item（纯字节搬运，不经过解码）。
+    commands:
+      - Set-Content        # sc
+      - Add-Content        # ac
+      - Clear-Content      # clc
+      - Out-File           # 无别名
+      - Tee-Object         # tee
+      - Export-Csv         # epcsv
+      - Export-Clixml      # 无别名
+      - Start-Transcript   # 无别名
+      - sc
+      - ac
+      - clc
+      - tee
+      - epcsv
+    # .NET 直写。名字本身不专指文件（RunspaceFactory::Create 也是 Create），
+    # 所以还要求调用目标里含 File 或 Stream 才算。
+    memberTargetContains: ['File', 'Stream']
+    memberNames:
+      - WriteAllText
+      - WriteAllBytes
+      - WriteAllLines
+      - AppendAllText
+      - AppendAllLines
+      - Create
+      - CreateText
+      - OpenWrite
+      - OpenText
+      - new
+    # 文件重定向 `>` / `>>`；目标是 $null 的自动豁免（那是抑制输出，不是写文件）。
+    redirects: true
 
-  # ② 命令名 + 逐命令参数条件（when）：只有**这条命令自己**的参数满足条件才算。
-  #    这是它比"整行文本匹配"准的地方 —— 同行别的命令的 `-c` / `-p` 不会串进来。
+  # ── ② 内联代码：解释器 + 求值开关 ─────────────────────────────────────────
   #
-  #    ⚠️ 为什么分成两条：**同一个开关在不同解释器上含义不同**。
-  #       `python -c` = 跑代码（该拦）；`node -c` = 语法检查（正当，必须放行）。
-  #       一条规则共用一张开关表就会误伤 —— 这是从真实误报里学到的，别合并。
-  - id: example-inline-code-node
+  # ⚠️ 为什么不合并成一条：**同一个开关在不同解释器上含义不同**。
+  #    `python -c` = 跑代码（该拦）；`node -c` = 语法检查（正当，必须放行）。
+  - id: inline-code-node
     why: |
-      解释器 + 求值开关 = 把代码塞进参数：事后没人看得到它改了什么，也没有 diff 可回退。
-      正确姿势：把代码落到脚本文件里再跑。
-    commands: [node, node.exe]
+      内联代码执行已禁用（`node -e` / `deno eval` 这类"把代码塞进参数"的写法）。
+      代码不在文件系统里：事后没人看得到它改了什么，也没有 diff 可回退。
+      正确姿势：把脚本落到文件里再跑（可审、可回滚）。
+    commands: [node, node.exe, deno, deno.exe, bun, bun.exe]
     when:
-      flags: ['-e', '-p', '--eval', '--print']   # 大小写不敏感；前缀即命中（-p 命中 --print）
+      flags: ['-e', '-p', '--eval', '--print']
       argsExact: ['eval']
 
-  - id: example-inline-code-interp
+  - id: inline-code-interp
     why: |
-      同上：`python -c` / `powershell -Command` / `-EncodedCommand` 也是把代码塞进参数。
-      正确姿势：把代码落到脚本文件里再跑。
-    commands: [python, python.exe, py, powershell, powershell.exe, pwsh, pwsh.exe]
+      内联代码执行已禁用（`python -c` / `powershell -Command` / `-EncodedCommand` 这类写法）。
+      正确姿势：把脚本落到文件里再跑。
+    commands: [python, python3, python.exe, python3.exe, py, powershell, powershell.exe, pwsh, pwsh.exe]
     when:
-      # ⚠️ `-c` 只放在这一条里：对 python / powershell 它是"跑代码"；对 node 它是语法检查。
-      flags: ['-c', '-Command', '-EncodedCommand']
+      # `-c` 只在这一条里（对 python / powershell 是"跑代码"；对 node 是语法检查）。
+      flags: ['-c', '-Co', '-Command', '-EncodedCommand', '-EncodedArguments', '-Enc']
 
-  # ③ 受保护路径：命令名 AND 路径 —— **两个维度都命中**才拦。
-  #    所以"读 / 列举"完全不受影响，只有会动它的动词才拦。
-  - id: example-protected-path
+  # ── ③ 凭据文件：只看工具参数里的**路径**，不碰正文 ────────────────────────
+  #    这一支不经过 shell。所以在文件正文里"提到"这些名字是正当的，不算写它们。
+  - id: credentials-readonly
     why: |
-      这里演示"受保护目录只拦会让东西消失的动作"。
-    commands: [Remove-Item, ri, rm, del, Move-Item, Rename-Item]
-    paths: ['.git', 'node_modules']    # 子串匹配：命令里提到这些目录才算
-
-  # ④ 提及即停：命令名**或任意参数**里出现这串字就拦。
-  #    判据故意不含动词 —— 动词名单永远差一条，而"名字"是唯一稳定的东西。
-  - id: example-naming-convention
-    why: |
-      名字里带这个字样的目录是"别去碰"的：读和跑一视同仁（已知代价，接受）。
-    mentions: ['DO-NOT-RUN']
-
-  # ⑤ 工具参数规则：非 shell 工具（edit / write）的目标**路径**。
-  #    这一支不经过 PowerShell 解析器，只看路径型参数（file_path / path / dir …），
-  #    **不看正文** —— 所以在文件里"提到"这个名字是正当的，不算写它。
-  - id: example-protected-files
-    why: |
-      演示"某些文件只许走特定流程"。
+      这些是凭据落点：写它们等于把凭据暴露或毁掉。
+      正确姿势：凭据配在环境变量或专门的凭据存储里；要动先 Copy-Item 备份到临时位置。
     tools: [edit, write]
-    paths: ['CHANGELOG.md']
+    paths: ['.npmrc', '.credentials', '.netrc', 'id_rsa', 'id_ed25519', 'id_ecdsa']
+
+  # ── ④ 受保护目录：**删除/改名** 与 路径 同时命中才拦（读与列举不受影响）────
+  - id: protected-path
+    why: |
+      这些目录被删或改名之后，行为差异要到下次运行才暴露（依赖、版本历史、钩子都在里面）。
+      读取与列举不受限制。
+    commands: [Remove-Item, ri, rm, del, erase, rd, rmdir, Clear-Content, Move-Item, mi, move, mv, Rename-Item, ren, rni]
+    paths: ['.git', 'node_modules']
 
 deliberate:
-  # ⑥ 三思：正当但代价高的动作。不直接拒，而是插一道冷却窗口 ——
-  #    窗口内回答"是"和"否"都无效，逼着停下来把两个问题过一遍。
-  - id: example-deliberate-delete
+  # ── ⑤ 删除：三思（受保护位置 / 递归 / 通配 / 强制，任一命中就停）──────────
+  - id: destructive-delete
     cooldownSeconds: 10
     why: |
       删除不可逆：shell 删除没有回收站、没有 diff、进不了回退。
-      更便宜的做法：先 Copy-Item 备份；或别删只挪（Move-Item 可逆）。
-    commands: [Remove-Item, del, erase, rd, ri, rm, rmdir]
+      更便宜的做法：先 Copy-Item 备份；或别删只挪（Move-Item 到散放区，可逆）。
+    commands: [Remove-Item, del, erase, rd, ri, rm, rmdir, Clear-Item, cli]
     when:
       flags: ['-recurse', '-force']
-      wildcard: true                 # 参数里出现 * 或 ?
-      paths: ['src', 'docs']
+      wildcard: true
+      paths: ['.git', 'node_modules', '.ssh', '.aws', '.kube', '.env', 'src', 'docs']
 
-  # ⑦ 三思 + 合取（when.all）：两组条件**都**成立才停。
-  #    用来区分"看起来像"和"真的贵" —— 建分支无害，但 `-- .` 会丢整棵工作树。
-  - id: example-deliberate-scope
+  # ── ⑥ 移动 / 改名到已存在的目标 = 覆盖 ───────────────────────────────────
+  - id: destructive-move
     cooldownSeconds: 10
     why: |
-      同一条 `git checkout`：建分支无害，`checkout -- .` 会丢整棵工作树。
-    commands: [git]
+      移动 / 改名到**已存在的目标**上就是覆盖 —— 和删除一样不可逆。
+      （实测：不加 -Force 时 Move-Item / Rename-Item 会报 "Cannot create a file when that file
+      already exists."，所以 **-Force 正好就是"允许覆盖"那一档**。）
+    commands: [Move-Item, mi, move, mv, Rename-Item, ren, rni]
+    when:
+      flags: ['-force']
+      wildcard: true
+      paths: ['.git', 'node_modules', '.ssh', '.aws', '.kube', '.env', 'src', 'docs']
+
+  # Copy-Item -Force 到已存在目标也是覆盖，但**默认不拦** ——
+  # 它是"先备份"那条建议用的动作；把备份也停下，等于罚自己推荐的做法。
+  # 想拦就取消注释；注意它会把"覆盖旧备份"一起停下。
+  # - id: destructive-copy-overwrite
+  #   cooldownSeconds: 10
+  #   commands: [Copy-Item, cp, copy, cpi]
+  #   when:
+  #     flags: ['-force']
+
+  # ── ⑦ 注册表增删改（读不受限）───────────────────────────────────────────
+  #
+  # ⚠️ 为什么拆成两条：`reg` 的子命令在**第一个位置参数**上；而 `*-ItemProperty` 这类 cmdlet
+  #    的第一个位置参数是**路径**，根本没有"子命令"这一维 —— 塞进同一条 `when.all`
+  #    会让 cmdlet 那一半永远不命中（2026-10-27 冒烟测试发现）。
+  - id: registry-write
+    cooldownSeconds: 10
+    why: |
+      注册表增删改的代价高：改错会影响整机行为，而且没有 diff、没有回退。
+      **读不受限**（reg query / Get-ItemProperty 都可以）。
+    commands: [reg, reg.exe]
     when:
       all:
-        - subcommands: ['checkout', 'restore', 'reset', 'clean']
-        - argsExact: ['.']
-          flags: ['--hard', '-f', '-fd']
-    # 进冷却**之前**跑这些**只读**探针，把"这条命令会丢什么"现算出来放进窗口。
-    # 探针必须只读 —— 编译期会拒绝带写动词的探针。
+        - subcommands: [add, delete, import, restore, copy, load, unload]
+        - paths: ['HKCU', 'HKLM', 'HKCR', 'HKU', 'HKCC']
+
+  - id: registry-write-cmdlet
+    cooldownSeconds: 10
+    why: |
+      同上：这些 cmdlet 直接改注册表项 / 值。**读不受限**（Get-ItemProperty / Get-Item 都可以）。
+    commands:
+      - New-ItemProperty
+      - Set-ItemProperty
+      - Remove-ItemProperty
+      - Clear-ItemProperty
+      - Rename-ItemProperty
+      - Copy-ItemProperty
+      - Move-ItemProperty
+      - New-Item
+      - Remove-Item
+      - Rename-Item
+      - Move-Item
+      - Clear-Item
+      - ni
+      - sp
+      - rp
+      - clp
+      - rnp
+      - cpp
+      - mp
+      - del
+      - erase
+      - rd
+      - ri
+      - rm
+      - rmdir
+      - cli
+    when:
+      paths: ['HKCU', 'HKLM', 'HKCR', 'HKU', 'HKCC']
+
+  # ── ⑧ git 的范围收缩：会把工作区内容丢掉 ─────────────────────────────────
+  - id: destructive-git
+    cooldownSeconds: 10
+    why: |
+      git 的范围收缩子命令会把工作区的内容丢掉，而**未提交的部分不进 reflog** ——
+      reflog 只记 HEAD 移动过的东西，对"从未提交的文件"没有任何记录。
+      想看清楚再动（都只读）：git status --short / git diff --stat / git stash list。
+    commands: [git, git.exe]
+    when:
+      all:
+        - subcommands: [checkout, restore, reset, clean, stash, branch, push]
+        - argsExact: ['.', 'drop', 'clear']
+          wildcard: true
+          flags: ['--hard', '--force', '-f', '-fd', '-fdx', '-d', '-D', '--delete']
+    # 进冷却之前跑这些**只读**探针，把"这条命令会丢什么"现算出来放进窗口。
     evidence:
       - git status --porcelain
       - git diff --shortstat HEAD
