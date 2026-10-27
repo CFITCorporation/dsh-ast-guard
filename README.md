@@ -139,5 +139,3 @@ npm 上已经有两个相邻的项目。先认账，再说差异：
 |---|---|---|
 | `dsh-ast-guard` | tree-sitter 解析 bash + powershell CST；`allow/ask/block`；DNA 模式；沙箱升级联动 | 我们用 **PowerShell 自带解析器**（不引 WASM grammar、零原生依赖）；我们是 **三思冷却窗口**（不是弹窗四选）；我们有 **只读探针**把"这条命令会丢什么"现算出来；规则是朴素 YAML + 自有维度集 |
 | `dsh-pwsh-guard` | 禁 shell 文本 I/O（`Select-String` / `Get-Content` / `node -e` …），指向 `read` / `grep` / `glob` | 目标不同：它管**读的方式**，我们管**写内容 / 删除 / 范围收缩**。**可以并存** |
-
-本项目的 npm 包名是 **`@cfitsec/dsh-ast-guard`** —— 裸名 `dsh-ast-guard` 已被占用。
