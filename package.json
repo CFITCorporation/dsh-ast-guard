@@ -1,6 +1,6 @@
 {
   "name": "@cfitsec/dsh-ast-guard",
-  "version": "0.1.0",
+  "version": "2.0.0",
   "description": "PowerShell syntax-tree guard for DSH: a resident parser plus its own rule file. Judges pwsh commands by syntax tree (not by text), and adds a deliberation tier for costly-but-legitimate actions.",
   "type": "module",
   "main": "lib/index.js",
