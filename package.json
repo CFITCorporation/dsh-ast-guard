@@ -14,6 +14,7 @@
     "lib",
     "cordis.patch.yml",
     "rules",
+    "docs",
     "README.md"
   ],
   "scripts": {

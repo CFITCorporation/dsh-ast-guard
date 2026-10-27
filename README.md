@@ -112,6 +112,9 @@ Set-Content -Path "$env:TEMP\ast-guard-探针.txt" -Value x
 
 ## 跑自带的测试（可选）
 
+> ⚠️ **测试不在 npm 包里**（`files` 只含 `lib` / `rules` / `cordis.patch.yml` / `README.md`）——
+> 要用下面的命令，得先 `git clone` 源码。
+
 在 clone 下来的目录里：
 
 ```powershell
@@ -120,6 +123,12 @@ node test/import-check.mjs   # 入口能否装载（不启动）
 node test/smoke.mjs          # 30 条裁决用例：只解析、不执行；不联网、不写任何文件
 node test/hook.mjs           # 12 条插件级用例：走真的 apply()（假 ctx）
 ```
+
+## 改规则之前先读这一份
+
+[`docs/维护规则.md`](docs/维护规则.md) —— 给**要动规则的人或智能体**：
+维度速查、加规则的流程、我们踩过的坑（别名 / `args[0]` / YAML 单引号 / cmdlet 没有子命令）、
+以及**永远不要做的三件事**（留反向后门、用内容白名单、静默放行）。
 
 ## 与生态里同类项目的关系
 
