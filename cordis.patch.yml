@@ -1,0 +1,24 @@
+# dsh-ast-guard bundle patch: mount the syntax-tree guard.
+#
+# 这是一个**独立**的守卫层：把 pwsh / powershell 命令交给随宿主启动的常驻解析器，按语法树判定。
+# 规则全在 `rulesFile` 指向的 YAML 里（默认按会话 cwd 解析），代码里不写死任何策略。
+#
+# 与"文本匹配式"守卫的关系：**可以并存，但不要依赖顺序**。
+# 两者都用最朴素的 ctx.on 注册（cordis 的 register 默认 push，waterfall 从数组头 shift），
+# "谁先跑"是插件加载顺序的副产物，不是接口承诺 —— 所以让每条规则自己说清"拦什么"，
+# 不要依赖"前一层放行了我才说话"这种假设。
+- insert:
+    - id: ast-guard
+      name: dsh-ast-guard
+      config:
+        # 按会话 cwd 解析：`<你的工作区>/.dsh/ast-rules.yaml`。
+        # 文件不存在 = 本层无意见（不是错误）。也可以写绝对路径。
+        rulesFile: .dsh/ast-rules.yaml
+        enabled: true
+        # 解析器不可用时：closed = 拒绝并说明（安全优先），open = 放行。
+        # 默认 closed：宁可停一下，也不要"看起来在拦、其实没判"。
+        failPolicy: closed
+        # 规则文件读坏时：closed = 拒绝并说明怎么修（默认，避免静默失效），open = 放行。
+        onRuleError: closed
+        # 单条命令的解析预算。实测日常命令 2~6 ms，200 行约 70 ms。
+        timeoutMs: 5000

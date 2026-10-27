@@ -1,0 +1,99 @@
+# dsh-ast-guard · 示例规则（demo）
+#
+# 用途：把**每个能用的维度各演示一次**，让你看清这套规则的形状。
+# 它**不是**推荐配置 —— 复制成 `<你的工作区>/.dsh/ast-rules.yaml` 之后按自己的情况改。
+#
+# 两条通用约定：
+#   · needle（paths / mentions / argsContain）一律**大小写不敏感**，且是**子串**匹配，不是 glob；
+#   · `why` 的正文会**逐字**出现在拒绝文案里 —— 所以它同时是"给人看的说明"和"给智能体看的正确姿势"。
+version: 1
+
+deny:
+  # ① 最基础的形状：按命令名拒。
+  - id: example-write-verbs
+    why: |
+      这条只是示例：拦"写文件内容"的命令词。
+      正确姿势：定点替换用 edit 工具；整份新写用 write 工具。
+    commands: [Set-Content, Add-Content, Clear-Content, Out-File]
+    # redirects: true   # 打开它 = 连 `>` / `>>` 一起拦（目标是 `$null` 的自动豁免）
+
+  # ② 命令名 + 逐命令参数条件（when）：只有**这条命令自己**的参数满足条件才算。
+  #    这是它比"整行文本匹配"准的地方 —— 同行别的命令的 `-c` / `-p` 不会串进来。
+  #
+  #    ⚠️ 为什么分成两条：**同一个开关在不同解释器上含义不同**。
+  #       `python -c` = 跑代码（该拦）；`node -c` = 语法检查（正当，必须放行）。
+  #       一条规则共用一张开关表就会误伤 —— 这是从真实误报里学到的，别合并。
+  - id: example-inline-code-node
+    why: |
+      解释器 + 求值开关 = 把代码塞进参数：事后没人看得到它改了什么，也没有 diff 可回退。
+      正确姿势：把代码落到脚本文件里再跑。
+    commands: [node, node.exe]
+    when:
+      flags: ['-e', '-p', '--eval', '--print']   # 大小写不敏感；前缀即命中（-p 命中 --print）
+      argsExact: ['eval']
+
+  - id: example-inline-code-interp
+    why: |
+      同上：`python -c` / `powershell -Command` / `-EncodedCommand` 也是把代码塞进参数。
+      正确姿势：把代码落到脚本文件里再跑。
+    commands: [python, python.exe, py, powershell, powershell.exe, pwsh, pwsh.exe]
+    when:
+      # ⚠️ `-c` 只放在这一条里：对 python / powershell 它是"跑代码"；对 node 它是语法检查。
+      flags: ['-c', '-Command', '-EncodedCommand']
+
+  # ③ 受保护路径：命令名 AND 路径 —— **两个维度都命中**才拦。
+  #    所以"读 / 列举"完全不受影响，只有会动它的动词才拦。
+  - id: example-protected-path
+    why: |
+      这里演示"受保护目录只拦会让东西消失的动作"。
+    commands: [Remove-Item, ri, rm, del, Move-Item, Rename-Item]
+    paths: ['.git', 'node_modules']    # 子串匹配：命令里提到这些目录才算
+
+  # ④ 提及即停：命令名**或任意参数**里出现这串字就拦。
+  #    判据故意不含动词 —— 动词名单永远差一条，而"名字"是唯一稳定的东西。
+  - id: example-naming-convention
+    why: |
+      名字里带这个字样的目录是"别去碰"的：读和跑一视同仁（已知代价，接受）。
+    mentions: ['DO-NOT-RUN']
+
+  # ⑤ 工具参数规则：非 shell 工具（edit / write）的目标**路径**。
+  #    这一支不经过 PowerShell 解析器，只看路径型参数（file_path / path / dir …），
+  #    **不看正文** —— 所以在文件里"提到"这个名字是正当的，不算写它。
+  - id: example-protected-files
+    why: |
+      演示"某些文件只许走特定流程"。
+    tools: [edit, write]
+    paths: ['CHANGELOG.md']
+
+deliberate:
+  # ⑥ 三思：正当但代价高的动作。不直接拒，而是插一道冷却窗口 ——
+  #    窗口内回答"是"和"否"都无效，逼着停下来把两个问题过一遍。
+  - id: example-deliberate-delete
+    cooldownSeconds: 10
+    why: |
+      删除不可逆：shell 删除没有回收站、没有 diff、进不了回退。
+      更便宜的做法：先 Copy-Item 备份；或别删只挪（Move-Item 可逆）。
+    commands: [Remove-Item, del, erase, rd, ri, rm, rmdir]
+    when:
+      flags: ['-recurse', '-force']
+      wildcard: true                 # 参数里出现 * 或 ?
+      paths: ['src', 'docs']
+
+  # ⑦ 三思 + 合取（when.all）：两组条件**都**成立才停。
+  #    用来区分"看起来像"和"真的贵" —— 建分支无害，但 `-- .` 会丢整棵工作树。
+  - id: example-deliberate-scope
+    cooldownSeconds: 10
+    why: |
+      同一条 `git checkout`：建分支无害，`checkout -- .` 会丢整棵工作树。
+    commands: [git]
+    when:
+      all:
+        - subcommands: ['checkout', 'restore', 'reset', 'clean']
+        - argsExact: ['.']
+          flags: ['--hard', '-f', '-fd']
+    # 进冷却**之前**跑这些**只读**探针，把"这条命令会丢什么"现算出来放进窗口。
+    # 探针必须只读 —— 编译期会拒绝带写动词的探针。
+    evidence:
+      - git status --porcelain
+      - git diff --shortstat HEAD
+      - git ls-files --others --exclude-standard
