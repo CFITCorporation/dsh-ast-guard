@@ -1,7 +1,8 @@
 # dsh-ast-guard bundle patch: mount the syntax-tree guard.
 #
 # 这是一个**独立**的守卫层：把 pwsh / powershell 命令交给随宿主启动的常驻解析器，按语法树判定。
-# 规则全在 `rulesFile` 指向的 YAML 里（默认按会话 cwd 解析），代码里不写死任何策略。
+# 规则全在 `rulesFile` 指向的 YAML 里；默认用**包内自带**的 `rules/default.yaml`
+# （规则跟插件走：装上就有一套能跑的规则，不用把文件搬到哪里去）。代码里不写死任何策略。
 #
 # 与"文本匹配式"守卫的关系：**可以并存，但不要依赖顺序**。
 # 两者都用最朴素的 ctx.on 注册（cordis 的 register 默认 push，waterfall 从数组头 shift），

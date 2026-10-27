@@ -49,6 +49,9 @@ const inlineCases = [
   ['node -c 语法检查（放行 —— 与 python -c 含义不同）', 'node -c tool.mjs', null],
   ['python -c', 'python -c "print(1)"', 'inline-code-interp'],
   ['powershell -Command', 'powershell -NoProfile -Command "Get-Date"', 'inline-code-interp'],
+  // 字符串里的写命令（语法树看不见内层代码，只按参数子串兜一层）
+  ['iex 里藏写命令', 'iex "Set-Content -Path x.txt -Value y"', 'encoded-write'],
+  ['iex 只读（放行）', 'iex "Get-Date"', null],
   ['python -m（放行）', 'python -m http.server 8000', null],
 ]
 

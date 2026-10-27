@@ -74,6 +74,19 @@ deny:
       # `-c` 只在这一条里（对 python / powershell 是"跑代码"；对 node 是语法检查）。
       flags: ['-c', '-Co', '-Command', '-EncodedCommand', '-EncodedArguments', '-Enc']
 
+  # ── ②b 字符串里的写命令：`iex "Set-Content …"` 这类 ───────────────────────
+  #    语法树看得见 `iex` 这个命令节点，但**看不见字符串里的代码** —— 只能按参数子串兜一层。
+  #    这条同时演示 `argsContain` 维度（参数里**含**这串就算）。
+  - id: encoded-write
+    why: |
+      检测到用 Invoke-Expression 执行写入命令。**请直接用 edit 或 write 工具。**
+      代码在字符串里：事后没人看得到它改了什么，也没有 diff、没有快照、进不了回退。
+      （这条按参数子串判，所以只覆盖下面点名的写动词 —— 覆盖不全是有意的：
+       真正的兜底是"写内容一律走 edit / write"，不是把所有写动词列全。）
+    commands: [invoke-expression, iex]
+    when:
+      argsContain: ['set-content', 'add-content', 'out-file']
+
   # ── ③ 凭据文件：只看工具参数里的**路径**，不碰正文 ────────────────────────
   #    这一支不经过 shell。所以在文件正文里"提到"这些名字是正当的，不算写它们。
   - id: credentials-readonly
