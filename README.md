@@ -1,45 +1,107 @@
 # dsh-ast-guard
 
-> 一个 **Windows / PowerShell** 的命令守卫插件（DSH 插件）：把 `pwsh` / `powershell` 命令交给
-> **PowerShell 自带的语法树解析器**判定，按**效应**而不是命令名触发。
-> 规则写在 YAML 里，**代码里不写死任何策略**；默认带上包内的一份 `rules/default.yaml`。
+> DSH（DeepSeek Harness）的**命令守卫插件**：在工具执行前，把 `pwsh` / `powershell` 命令交给
+> **PowerShell 自带的语法树解析器**判定，按**效应**拦截（不是按命令名）；规则写在 YAML 里，
+> 代码里不写死任何策略。
 
-## 它比"文本匹配"多什么
+## 前置
 
-- **逐命令看参数**：`when: { flags, wildcard, paths, subcommands, argsExact, argsContain, all }`
-  —— `adb … -p` 里的 `-p` 不会被当成 `node -p`（这是文本匹配做不到的）；
-- **受保护路径**（命令名 AND 路径）；**提及即停**（名字出现就停，不列动词）；
-- **工具参数规则**：`edit` / `write` 的目标路径 —— 不经过 shell，只看路径型参数，**不碰正文**；
-- **三思层**：正当但代价高的动作插一道冷却窗口 + 一次性放行（绑命令哈希）；
-  进窗口**之前**跑规则里声明的**只读探针**，把"这条命令会丢什么"现算出来放进窗口。
+- **已经装好 DSH** —— 这是 DSH 插件，不是独立程序；
+- **Windows**（解析器用 `powershell.exe`，5.1 即可）；
+- **Node ≥ 22.19**。
 
-## 跑起来（dry-run，不执行任何命令）
+## 拿到它
+
+还没发布到 npm，先 clone：
 
 ```powershell
-node test/import-check.mjs   # 入口能否装载（不启动）
-node test/smoke.mjs          # 30 条裁决用例：只解析、不执行；不联网、不需要 git、不写任何文件
-node test/hook.mjs           # 12 条插件级用例：走真的 apply()（假 ctx），验注册/加载/文案/三思窗口
+git clone <本仓库地址>
+cd <你 clone 下来的目录>
 ```
 
-需要：Node ≥ 22.19；Windows 上的 `powershell.exe`（5.1 即可）。
+## 装进 DSH
 
-## 安装
+```powershell
+dsh plugin --profile web add <你 clone 下来的目录>
+```
 
-1. 把本目录放到任意位置，用 `link:` 或 `dsh plugin add <本目录>` 挂进 profile；
-2. 包自带 `cordis.patch.yml` ⇒ 装上**自动注入配置**，不需要手改 profile；
-3. **规则不用搬**：默认用包内 `rules/default.yaml`（规则跟插件走，装上就生效）。
-   想用自己的规则 ⇒ 在插件配置里写 `rulesFile`（相对会话 cwd 的路径，或绝对路径）；
-4. **改完配置要重启宿主**才生效（插件与配置在启动时加载，不热更新）。
-   回滚：把 profile 里那条插件/配置去掉，再重启一次即可 —— 默认规则在包内，不往工作区留残留。
+**然后重启 DSH**（插件与配置在启动时加载，**不热更新**）。
 
-`rules/default.yaml` 是一套**能直接用**的默认规则：写内容族 + 条目操作族 + 内联代码 + 凭据文件 +
-受保护目录 + 五组三思。按自己的情况复制一份再改。
+装好后插件会自己把配置挂上（包里有 `cordis.patch.yml`），规则用**包内**的 `rules/default.yaml` ——
+**不需要你搬任何文件**。
+
+<details>
+<summary>没有 <code>dsh plugin add</code> 这个命令时，手动挂（两步）</summary>
+
+1. 在 `~/.dsh/profiles/<你的 profile>/package.json` 的 `dependencies` 里加一行：
+
+   ```json
+   "@cfitsec/dsh-ast-guard": "link:<你 clone 下来的绝对路径>"
+   ```
+
+2. 在同一个文件里，把它加进 `dsh.profile.bundles` 数组。
+
+   然后**重启 DSH**。
+</details>
+
+## 验证它真的在拦
+
+重启后，随便开一个 **pwsh** 会话，跑一条会被拦的命令：
+
+```powershell
+Set-Content -Path "$env:TEMP\ast-guard-探针.txt" -Value x
+```
+
+应该看到：
+
+```
+[ast-guard] 拒绝：content-write
+…（dsh-ast-guard v0.1.0；规则来自 …\rules\default.yaml；…）
+```
+
+**看到了 ⇒ 装好了。** 没看到的话：
+
+- 看 DSH 日志里有没有 `ast-guard:` 开头的行（插件加载失败会写在那里）；
+- 确认**重启过**宿主；
+- 在插件目录里跑一次 `npm install`（它只有一个依赖 `yaml`，装好再重启）。
+
+## 它管什么
+
+- **写文件内容**：`Set-Content` / `Add-Content` / `Clear-Content` / `Out-File` / `Tee-Object` / `Export-*`、
+  `.NET` 的 `WriteAll*`、重定向 `>` `>>`（`$null` 豁免）、以及 `iex "Set-Content …"` 这种字符串里的写入；
+- **删除 / 移动 / 改名**：受保护位置（`.git`、`node_modules`、`.ssh` …）、递归、通配、`-Force` 触发**三思**；
+- **内联代码**：`node -e`、`python -c`、`powershell -Command`、`-EncodedCommand` …（逐命令看参数）；
+- **凭据文件**：`edit` / `write` 的目标路径（`.npmrc` / `.credentials` / `id_rsa` …），**只看路径，不碰正文**；
+- **注册表**增删改、**git 范围收缩**（`git checkout -- .` 这类）⇒ **三思**。
+
+**三思**不是拒绝：插一道 10 秒冷却窗口，窗口内回答"是"和"否"都无效；冷却结束时先跑规则里声明的
+**只读探针**，把"这条命令会丢什么"现算出来放进窗口，再用 `ast_confirm` 带编号回答。
+
+## 改规则
+
+默认规则是一套能直接用的（写内容族 + 条目操作族 + 内联 + 凭据 + 受保护目录 + 五组三思）。
+想改成自己的：
+
+1. 复制一份：`cp rules/default.yaml my-rules.yaml`，按需要改；
+2. 在 profile 的插件配置里指过去（`~/.dsh/profiles/<profile>/cordis.patch.yml`）：
+
+   ```yaml
+   - id: ast-guard
+     config:
+       rulesFile: <绝对路径，或相对会话 cwd 的路径>
+   ```
+
+3. **重启**（配置不热更新；规则文件本身改了会热加载）。
+
+完整规则词表：`commands` · `memberNames` · `redirects` ·
+`when{ flags, wildcard, paths, subcommands, argsExact, argsContain, all }` ·
+`tools` · `paths` · `mentions` · `evidence` · 三思的 `cooldownSeconds` / `when` / `evidence`。
 
 ## 判不了就拒（fail-closed）
 
 规则文件读坏、解析器起不来 ⇒ **拒绝并说明怎么修**，不是静默放行。
-理由很简单：一个"看起来在拦、其实没判"的守卫，比没有守卫更危险 —— 它骗的是使用者。
-（对应配置：`onRuleError: closed` / `failPolicy: closed`，两者都可以改成 `open`，但要想清楚代价。）
+理由很简单：一个"看起来在拦、其实没判"的守卫比没有守卫更危险 —— 它骗的是使用者。
+（对应配置：`onRuleError: closed` / `failPolicy: closed`，都能改成 `open`，但要想清楚代价。）
 
 ## 边界（别误当成安全边界）
 
@@ -47,6 +109,17 @@ node test/hook.mjs           # 12 条插件级用例：走真的 apply()（假 c
 - 护的是"**忘了那一次**"，不防"故意绕"：对故意的，靠回退点与审计，不靠墙。
 - 看不见**字符串里**的东西（`Start-Process … -ArgumentList`、`[scriptblock]::Create("…")`、`cmd /c "…"`）。
 - 覆盖面是**正面清单**，列不完；只读列举受保护目录**也会被拦**（"提及即停"的已知代价）。
+
+## 跑自带的测试（可选）
+
+在 clone 下来的目录里：
+
+```powershell
+npm install                  # 只有一个依赖 yaml；不装测试跑不起来
+node test/import-check.mjs   # 入口能否装载（不启动）
+node test/smoke.mjs          # 30 条裁决用例：只解析、不执行；不联网、不写任何文件
+node test/hook.mjs           # 12 条插件级用例：走真的 apply()（假 ctx）
+```
 
 ## 与生态里同类项目的关系
 
