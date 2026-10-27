@@ -12,22 +12,19 @@
 
 ## 拿到它
 
-还没发布到 npm，先 clone：
+从 npm 装（推荐）：
 
 ```powershell
-git clone <本仓库地址>
-cd <你 clone 下来的目录>
+dsh plugin --profile web add @cfitsec/dsh-ast-guard
 ```
+
+想改源码再装：`git clone https://github.com/CFITCorporation/dsh-ast-guard`，然后把那个目录交给 `dsh plugin add`。
 
 ## 装进 DSH
 
-```powershell
-dsh plugin --profile web add <你 clone 下来的目录>
-```
+装完**重启 DSH**（插件与配置在启动时加载，**不热更新**）。
 
-**然后重启 DSH**（插件与配置在启动时加载，**不热更新**）。
-
-装好后插件会自己把配置挂上（包里有 `cordis.patch.yml`），规则用**包内**的 `rules/default.yaml` ——
+插件会自己把配置挂上（包里有 `cordis.patch.yml`），规则用**包内**的 `rules/default.yaml` ——
 **不需要你搬任何文件**。
 
 <details>
@@ -56,7 +53,7 @@ Set-Content -Path "$env:TEMP\ast-guard-探针.txt" -Value x
 
 ```
 [ast-guard] 拒绝：content-write
-…（dsh-ast-guard v0.1.0；规则来自 …\rules\default.yaml；…）
+…（dsh-ast-guard v2.0.0；规则来自 …\rules\default.yaml；…）
 ```
 
 **看到了 ⇒ 装好了。** 没看到的话：
