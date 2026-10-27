@@ -33,7 +33,7 @@ dsh plugin --profile web add <你 clone 下来的目录>
 <details>
 <summary>没有 <code>dsh plugin add</code> 这个命令时，手动挂（两步）</summary>
 
-1. 在 `~/.dsh/profiles/<你的 profile>/package.json` 的 `dependencies` 里加一行：
+1. 在 `$env:DSH_HOME\profiles\<你的 profile>\package.json` 的 `dependencies` 里加一行（`DSH_HOME` 是 DSH 的主目录，默认在 `~/.dsh`）：
 
    ```json
    "@cfitsec/dsh-ast-guard": "link:<你 clone 下来的绝对路径>"
@@ -82,8 +82,8 @@ Set-Content -Path "$env:TEMP\ast-guard-探针.txt" -Value x
 默认规则是一套能直接用的（写内容族 + 条目操作族 + 内联 + 凭据 + 受保护目录 + 五组三思）。
 想改成自己的：
 
-1. 复制一份：`cp rules/default.yaml my-rules.yaml`，按需要改；
-2. 在 profile 的插件配置里指过去（`~/.dsh/profiles/<profile>/cordis.patch.yml`）：
+1. 复制一份：`Copy-Item rules\default.yaml my-rules.yaml`，按需要改；
+2. 在 profile 的插件配置里指过去（`$env:DSH_HOME\profiles\<profile>\cordis.patch.yml`）：
 
    ```yaml
    - id: ast-guard
