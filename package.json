@@ -23,6 +23,9 @@
   "engines": {
     "node": ">=22.19"
   },
+  "dependencies": {
+    "yaml": "^2.9.0"
+  },
   "license": "UNLICENSED",
   "dsh": {
     "bundle": {
