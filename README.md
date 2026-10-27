@@ -112,13 +112,14 @@ Set-Content -Path "$env:TEMP\ast-guard-探针.txt" -Value x
 
 ## 跑自带的测试（可选）
 
-> ⚠️ **测试不在 npm 包里**（`files` 只含 `lib` / `rules` / `cordis.patch.yml` / `README.md`）——
-> 要用下面的命令，得先 `git clone` 源码。
+> ✅ **测试随包发布**（在 `test/` 里，纯 dry-run：只解析、不执行、不联网、只写临时目录）。
+> 所以从 npm 装好之后，也能直接拿它验证你改的规则。
 
-在 clone 下来的目录里：
+在包目录里（`npm publish` 装的话是 `node_modules/@cfitsec/dsh-ast-guard`）：
 
 ```powershell
-npm install                  # 只有一个依赖 yaml；不装测试跑不起来
+npm install                  # 只有一个依赖 yaml（以插件方式装好时通常已就位）
+npm test                     # = smoke + hook 两套
 node test/import-check.mjs   # 入口能否装载（不启动）
 node test/smoke.mjs          # 30 条裁决用例：只解析、不执行；不联网、不写任何文件
 node test/hook.mjs           # 12 条插件级用例：走真的 apply()（假 ctx）
