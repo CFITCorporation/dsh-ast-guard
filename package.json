@@ -2,6 +2,23 @@
   "name": "@cfitsec/dsh-ast-guard",
   "version": "2.0.0",
   "description": "PowerShell syntax-tree guard for DSH: a resident parser plus its own rule file. Judges pwsh commands by syntax tree (not by text), and adds a deliberation tier for costly-but-legitimate actions.",
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "powershell",
+    "command-guard",
+    "syntax-tree",
+    "safety"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CFITCorporation/dsh-ast-guard.git"
+  },
+  "homepage": "https://github.com/CFITCorporation/dsh-ast-guard#readme",
+  "bugs": {
+    "url": "https://github.com/CFITCorporation/dsh-ast-guard/issues"
+  },
   "type": "module",
   "main": "lib/index.js",
   "exports": {
