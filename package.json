@@ -1,5 +1,5 @@
 {
-  "name": "dsh-ast-guard",
+  "name": "@cfitsec/dsh-ast-guard",
   "version": "0.1.0",
   "description": "PowerShell syntax-tree guard for DSH: a resident parser plus its own rule file. Judges pwsh commands by syntax tree (not by text), and adds a deliberation tier for costly-but-legitimate actions.",
   "type": "module",
@@ -26,6 +26,10 @@
     "yaml": "^2.9.0"
   },
   "license": "MIT",
+  "author": "CFITSec",
+  "publishConfig": {
+    "access": "public"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
