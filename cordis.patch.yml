@@ -11,9 +11,9 @@
     - id: ast-guard
       name: dsh-ast-guard
       config:
-        # 按会话 cwd 解析：`<你的工作区>/.dsh/ast-rules.yaml`。
-        # 文件不存在 = 本层无意见（不是错误）。也可以写绝对路径。
-        rulesFile: .dsh/ast-rules.yaml
+        # 默认 = **包内自带**的 `rules/default.yaml`（规则跟插件走：装上就有一套能跑的规则，不用搬文件）。
+        # 想用自己的规则：把它改成相对会话 cwd 的路径（如 `.dsh/ast-rules.yaml`），或绝对路径。
+        # rulesFile: .dsh/ast-rules.yaml
         enabled: true
         # 解析器不可用时：closed = 拒绝并说明（安全优先），open = 放行。
         # 默认 closed：宁可停一下，也不要"看起来在拦、其实没判"。

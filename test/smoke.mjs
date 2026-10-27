@@ -1,7 +1,7 @@
 // 冒烟测试 —— **全程 dry-run**：只判"裁决"，不执行任何被测命令。
 //
 // 它做的事只有两件：
-//   ① 编译 rules/demo.yaml（走真的编译链，配置写错立刻炸）
+//   ① 编译 rules/default.yaml（走真的编译链，配置写错立刻炸）
 //   ② 把一批命令文本喂给常驻解析器（**只解析，不执行**），断言裁决结果
 //
 // 依赖：本机有 `powershell.exe`（Windows）。不需要联网、不需要 git、不碰工作区的任何配置。
@@ -10,7 +10,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const RULES = path.join(here, '..', 'rules', 'demo.yaml')
+const RULES = path.join(here, '..', 'rules', 'default.yaml')
 
 const { AstDaemon } = await import('../lib/daemon.js')
 const { parseRulesFile, evaluate, evaluateToolParams } = await import('../lib/rules.js')
